@@ -7,6 +7,9 @@ on:
         description: '版本号（留空则自动生成日期版本，格式：Y.M.D）'
         required: false
         default: ''
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   release:
@@ -30,6 +33,8 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
           else
             VERSION="$(date +'%Y.%-m.%-d')"
           fi
@@ -82,6 +87,7 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Commit version bump on current branch
+        if: github.event_name == 'workflow_dispatch'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           DOWNLOAD_URL="${{ steps.create_release.outputs.download_url }}"
