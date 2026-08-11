@@ -1,6 +1,6 @@
 {
   "name": "tv-helper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "嗅探局域网内的 Songloft TV 客户端，一键登录",
   "private": true,
   "scripts": {
