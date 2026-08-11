@@ -1,0 +1,7 @@
+{
+  "name": "电视助手",
+  "includes": [],
+  "plugins": [
+    "https://raw.githubusercontent.com/boluofan/songloft-plugin-tv-helper/main/plugin.json"
+  ]
+}

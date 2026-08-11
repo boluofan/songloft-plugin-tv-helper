@@ -41,6 +41,17 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Generated version: ${VERSION}"
 
+      - name: Validate tag version matches package.json
+        if: github.event_name == 'push'
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)"
+            exit 1
+          fi
+          echo "Version validated: $PKG_VERSION"
+
       - name: Update version in plugin.json / package.json
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -87,15 +98,16 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Commit version bump on current branch
-        if: github.event_name == 'workflow_dispatch'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           DOWNLOAD_URL="${{ steps.create_release.outputs.download_url }}"
+          UPDATE_URL="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/plugin.json"
           node -e "
             const fs = require('fs');
             const p = JSON.parse(fs.readFileSync('plugin.json', 'utf-8'));
             p.version = '${VERSION}';
             p.download_url = '${DOWNLOAD_URL}';
+            p.updateUrl = '${UPDATE_URL}';
             fs.writeFileSync('plugin.json', JSON.stringify(p, null, 2) + '\n');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
             pkg.version = '${VERSION}';
