@@ -14,7 +14,7 @@
     "storage"
   ],
   "updateUrl": "https://raw.githubusercontent.com/boluofan/songloft-plugin-tv-helper/main/plugin.json",
-  "download_url": "https://github.com/boluofan/songloft-plugin-tv-helper/releases/download/v0.1.0/tv-helper.jsplugin.zip",
+  "download_url": "https://github.com/boluofan/songloft-plugin-tv-helper/releases/download/v0.1.1/tv-helper.jsplugin.zip",
   "entryHash": "652594aa56ada8be332153ff31504c49bf12ae51e18150fb9dfe2ff47fbabec1",
   "zipHash": "68e7137d5fd248b4a7fb33f1129af6001aad6ccd2427aae58559807e22acae77"
 }
