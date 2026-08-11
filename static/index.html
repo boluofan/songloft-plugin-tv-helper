@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>电视助手</title>
+<style>
+/* 电视助手样式 — CSS 变量、reset、body 和字体由主程序 common.css 提供 */
+.wrap{max-width:560px;margin:0 auto;padding:24px 20px}
+h1{font-size:18px;font-weight:600;margin-bottom:4px}
+.sub{font-size:12px;color:var(--md-on-surface-variant);margin-bottom:20px}
+.card h2{font-size:13px;font-weight:600;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--md-on-surface-variant)}
+
+/* 顶部监听状态 */
+.listen-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.status{font-size:12px;padding:8px 12px;border-radius:6px;display:none}
+.status.ok{display:inline-block;background:rgba(76,175,80,.1);color:var(--md-success)}
+.status.err{display:inline-block;background:rgba(229,115,115,.1);color:var(--md-error)}
+.status.info{display:inline-block;background:rgba(124,154,224,.1);color:var(--md-primary)}
+.count{font-size:12px;color:var(--md-on-surface-variant)}
+
+/* 设备行 */
+.device-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--md-outline-variant)}
+.device-row:last-child{border-bottom:none}
+.device-info{flex:1;min-width:0}
+.device-name{display:block;font-size:14px;font-weight:500;color:var(--md-on-surface);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-name .version{margin-left:6px;font-size:11px;font-weight:400;color:var(--md-on-surface-variant)}
+.device-meta{display:block;font-size:12px;color:var(--md-on-surface-variant);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-row.offline .device-name{color:var(--md-on-surface-variant)}
+.tag{font-size:11px;color:var(--md-on-surface-variant);flex-shrink:0}
+.btn-sm{height:32px;padding:0 16px;font-size:13px}
+.empty{font-size:13px;color:var(--md-on-surface-variant);padding:16px 0;text-align:center;margin:0}
+
+/* 操作反馈 */
+.action{margin-top:16px}
+
+/* 配对码输入对话框 */
+.dialog-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100}
+.dialog-overlay.show{display:flex}
+.dialog{background:var(--md-surface);border-radius:var(--md-radius-md,12px);box-shadow:0 4px 16px rgba(0,0,0,.2);width:90%;max-width:400px;padding:20px}
+.dialog h3{font-size:16px;font-weight:600;margin:0 0 8px}
+.dialog-desc{font-size:13px;color:var(--md-on-surface-variant);margin:0 0 12px;line-height:1.6}
+.dialog-tip{font-size:12px;color:var(--md-on-surface-variant);margin:8px 0 16px;line-height:1.6}
+.pin-input{width:100%;box-sizing:border-box;text-align:center;font-size:28px;font-weight:700;letter-spacing:8px;padding:12px 8px;border:1px solid var(--md-outline);border-radius:var(--md-radius-sm,8px);background:transparent;color:var(--md-primary);outline:none;font-family:inherit;transition:border-color .2s}
+.pin-input:focus{border-color:var(--md-primary);border-width:2px;padding:11px 7px}
+.pin-input::placeholder{color:var(--md-outline);font-size:16px;font-weight:400;letter-spacing:2px}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>电视助手</h1>
+  <p class="sub">自动发现局域网内停留在登录配置页的 Songloft TV，输入电视屏幕上的配对码一键登录</p>
+
+  <div class="listen-row">
+    <span class="status info" id="listenStatus">监听中…</span>
+    <span class="count" id="onlineCount"></span>
+  </div>
+
+  <div class="card">
+    <h2>在线设备</h2>
+    <div id="deviceList">
+      <p class="empty">未发现电视，请确认电视已打开并停留在登录配置页（同一局域网）</p>
+    </div>
+  </div>
+
+  <div class="card" id="historyCard" style="display:none">
+    <h2>最近设备</h2>
+    <div id="historyList"></div>
+  </div>
+
+  <div class="status action" id="actionStatus" aria-live="polite"></div>
+</div>
+
+<!-- 配对码输入对话框 -->
+<div class="dialog-overlay" id="dialogOverlay">
+  <div class="dialog" role="dialog" aria-modal="true">
+    <h3>登录电视</h3>
+    <p class="dialog-desc" id="dialogDesc"></p>
+    <input type="text" id="dialogPinInput" class="pin-input" maxlength="4" inputmode="numeric" autocomplete="one-time-code" placeholder="4 位配对码">
+    <p class="dialog-tip">输入电视屏幕上显示的配对码，配对码每 60 秒自动刷新，请以电视当前显示为准</p>
+    <div class="dialog-actions">
+      <button class="btn btn-text" id="dialogCancelBtn">取消</button>
+      <button class="btn btn-filled btn-sm" id="dialogConfirmBtn">确认登录</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.getElementById(s);
+const { apiGet, apiPost } = window.SongloftPlugin || {};
+if (!apiGet) {
+  // 本地调试兜底
+  window.SongloftPlugin = {
+    apiGet: async url => (await fetch(url)).json(),
+    apiPost: async (url, data) => (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json(),
+  };
+}
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const fmtTime = ts => {
+  const d = new Date(ts), p = x => (x < 10 ? '0' + x : x);
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+let loggingIn = false;
+let pendingLogin = null;
+
+function setStatus(el, cls, text) {
+  el.className = 'status ' + cls;
+  el.textContent = text;
+}
+
+function deviceRow(dev, online) {
+  const name = `<span class="device-name">${esc(dev.name)}${dev.version ? `<span class="version">v${esc(dev.version)}</span>` : ''}</span>`;
+  const meta = online
+    ? `${esc(dev.ip)}:${dev.port}`
+    : `${esc(dev.ip)}:${dev.port} · 上次 ${fmtTime(dev.lastSeen)}`;
+  const right = online
+    ? `<button class="btn btn-filled btn-sm" data-login="${esc(dev.ip)}|${dev.port}" ${loggingIn ? 'disabled' : ''}>登录</button>`
+    : `<span class="tag">离线</span>`;
+  return `<div class="device-row${online ? '' : ' offline'}"><div class="device-info">${name}<span class="device-meta">${meta}</span></div>${right}</div>`;
+}
+
+async function loadDevices() {
+  try {
+    const res = await apiGet('/api/devices');
+    if (!res || !res.success) {
+      setStatus($('listenStatus'), 'err', '接口异常');
+      return;
+    }
+    setStatus($('listenStatus'), res.listening ? 'ok' : 'err', res.listening ? '监听中' : '监听失败');
+
+    const online = (res.data && res.data.online) || [];
+    const history = (res.data && res.data.history) || [];
+    $('onlineCount').textContent = online.length ? `${online.length} 台在线` : '';
+
+    $('deviceList').innerHTML = online.length
+      ? online.map(d => deviceRow(d, true)).join('')
+      : '<p class="empty">未发现电视，请确认电视已打开并停留在登录配置页（同一局域网）</p>';
+
+    const offline = history.filter(d => !online.some(o => o.ip === d.ip && o.port === d.port));
+    $('historyCard').style.display = offline.length ? '' : 'none';
+    if (offline.length) $('historyList').innerHTML = offline.map(d => deviceRow(d, false)).join('');
+  } catch (e) {
+    setStatus($('listenStatus'), 'err', '加载失败');
+  }
+}
+
+function askLogin(ip, port) {
+  pendingLogin = { ip, port };
+  $('dialogDesc').textContent = `${ip}:${port}`;
+  const input = $('dialogPinInput');
+  input.value = '';
+  $('dialogOverlay').classList.add('show');
+  setTimeout(() => input.focus(), 50);
+}
+
+async function doLogin(ip, port, pin) {
+  if (loggingIn) return;
+  loggingIn = true;
+  document.querySelectorAll('[data-login]').forEach(b => b.disabled = true);
+  const st = $('actionStatus');
+  setStatus(st, 'info', '正在发送登录请求…');
+  try {
+    const res = await apiPost('/api/login', { ip, port, pin });
+    if (res && res.success) setStatus(st, 'ok', res.message || '已发送，电视端正在登录');
+    else setStatus(st, 'err', (res && res.message) || '登录失败');
+  } catch (e) {
+    setStatus(st, 'err', '请求失败: ' + e);
+  }
+  loggingIn = false;
+  document.querySelectorAll('[data-login]').forEach(b => b.disabled = false);
+  setTimeout(() => { st.className = 'status action'; loadDevices(); }, 3000);
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-login]');
+  if (btn) {
+    const [ip, port] = btn.dataset.login.split('|');
+    askLogin(ip, Number(port));
+    return;
+  }
+  if (e.target.closest('#dialogConfirmBtn')) {
+    const pin = $('dialogPinInput').value.trim();
+    if (!/^\d{4}$/.test(pin)) {
+      $('dialogPinInput').focus();
+      return;
+    }
+    $('dialogOverlay').classList.remove('show');
+    if (pendingLogin) { doLogin(pendingLogin.ip, pendingLogin.port, pin); pendingLogin = null; }
+    return;
+  }
+  if (e.target.closest('#dialogCancelBtn') || e.target === $('dialogOverlay')) {
+    $('dialogOverlay').classList.remove('show');
+    pendingLogin = null;
+  }
+});
+
+loadDevices();
+setInterval(loadDevices, 3000);
+</script>
+</body>
+</html>

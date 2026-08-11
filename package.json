@@ -1,0 +1,15 @@
+{
+  "name": "tv-helper",
+  "version": "0.1.0",
+  "description": "嗅探局域网内的 Songloft TV 客户端，一键登录",
+  "private": true,
+  "scripts": {
+    "build": "songloft-plugin build",
+    "validate": "songloft-plugin validate"
+  },
+  "devDependencies": {
+    "@songloft/plugin-builder": "^2.12.3",
+    "@songloft/plugin-sdk": "^2.12.3",
+    "typescript": "^5.9.3"
+  }
+}

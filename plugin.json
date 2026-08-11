@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/songloft-org/plugin-toolchain/main/schemas/plugin.schema.json",
+  "name": "电视助手",
+  "version": "0.1.0",
+  "description": "嗅探局域网内的 Songloft TV 客户端，列表显示并支持配对码核对后一键登录（免输入账号密码）",
+  "author": "Boluofan",
+  "license": "Apache-2.0",
+  "icon": "icon.svg",
+  "entryPath": "tv-helper",
+  "main": "main.js",
+  "minHostVersion": "2.9.4",
+  "permissions": [
+    "net",
+    "storage"
+  ],
+  "entryHash": "652594aa56ada8be332153ff31504c49bf12ae51e18150fb9dfe2ff47fbabec1",
+  "zipHash": "68e7137d5fd248b4a7fb33f1129af6001aad6ccd2427aae58559807e22acae77"
+}
