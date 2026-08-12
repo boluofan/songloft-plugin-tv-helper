@@ -1,4 +1,4 @@
-import { createRouter, jsonResponse } from '@songloft/plugin-sdk';
+import { createRouter, jsonResponse, parseQuery } from '@songloft/plugin-sdk';
 import type { HTTPRequest, Router } from '@songloft/plugin-sdk';
 import type { DiscoveryService } from '../services/discovery';
 
@@ -25,6 +25,15 @@ export function registerHandlers(router: Router, discovery: DiscoveryService): v
     });
   });
 
+  router.get('/api/logs', async (req: HTTPRequest) => {
+    const q = parseQuery(req.query);
+    const after = Number(q.after);
+    return jsonResponse({
+      success: true,
+      logs: discovery.listLogs(Number.isFinite(after) && after > 0 ? after : 0),
+    });
+  });
+
   router.post('/api/login', async (req: HTTPRequest) => {
     const body = parseBody(req);
     const ip = String(body.ip || '').trim();
@@ -43,10 +52,10 @@ export function registerHandlers(router: Router, discovery: DiscoveryService): v
     }
     try {
       const token = await songloft.plugin.getToken();
-      const urls = await songloft.plugin.getNetworkAddresses();
-      const server = Array.isArray(urls) ? urls[0] : '';
+      // 必须是带协议和端口的完整 URL（getNetworkAddresses 只返回裸 IP），否则 TV 端 Retrofit 初始化会失败
+      const server = await songloft.plugin.getHostUrl();
       if (!server) {
-        return jsonResponse({ success: false, message: '无法获取宿主局域网地址，请检查宿主网络' });
+        return jsonResponse({ success: false, message: '无法获取宿主地址，请检查宿主网络' });
       }
       const resp = await fetch(`http://${ip}:${port}/push-token`, {
         method: 'POST',

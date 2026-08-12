@@ -1,7 +1,7 @@
 {
   "name": "tv-helper",
   "version": "0.1.1",
-  "description": "嗅探局域网内的 Songloft TV 客户端，一键登录",
+  "description": "Songloft TV客户端助手，提供配对码登录等功能",
   "private": true,
   "scripts": {
     "build": "songloft-plugin build",

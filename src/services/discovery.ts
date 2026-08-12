@@ -1,10 +1,13 @@
-import type { HistoryDevice, TvDevice } from '../types';
+import type { BeaconLog, HistoryDevice, TvDevice } from '../types';
 
 const BEACON_PORT = 18910;
 const DEVICE_TTL_MS = 30_000;
 const PRUNE_INTERVAL_MS = 5_000;
 const HISTORY_KEY = 'tv_history';
 const HISTORY_LIMIT = 20;
+const LOG_LIMIT = 300;
+const LOG_FETCH_MAX = 100;
+const RAW_TRUNCATE = 200;
 
 /**
  * TV 发现服务：监听 UDP 18910 收集 TV 配置页广播的 beacon，
@@ -15,6 +18,8 @@ export class DiscoveryService {
   private readonly devices = new Map<string, TvDevice>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private listening = false;
+  private readonly logs: BeaconLog[] = [];
+  private logSeq = 0;
 
   async init(): Promise<void> {
     try {
@@ -51,9 +56,15 @@ export class DiscoveryService {
   }
 
   private onBeacon(event: unknown): void {
+    const ev = (event || {}) as { Data?: string; data?: string; RemoteAddr?: string; remoteAddr?: string };
+    const b64 = ev.Data || ev.data || '';
+    const from = ev.RemoteAddr || ev.remoteAddr || '';
+    if (!b64) {
+      this.addLog({ ok: false, from, raw: '', error: '空数据包' });
+      return;
+    }
     try {
-      const ev = (event || {}) as { Data?: string; data?: string };
-      const raw = atob(ev.Data || ev.data || '');
+      const raw = this.decodeBeacon(b64);
       const data = JSON.parse(raw) as {
         app?: string;
         name?: string;
@@ -61,7 +72,10 @@ export class DiscoveryService {
         port?: number;
         version?: string;
       };
-      if (data.app !== 'songloft-tv' || !data.ip || !data.port) return;
+      if (data.app !== 'songloft-tv' || !data.ip || !data.port) {
+        this.addLog({ ok: false, from, raw: this.truncate(raw), error: '非 songloft-tv 广播' });
+        return;
+      }
       const key = `${data.ip}:${data.port}`;
       this.devices.set(key, {
         ip: data.ip,
@@ -70,9 +84,48 @@ export class DiscoveryService {
         version: String(data.version || ''),
         lastSeen: Date.now(),
       });
-    } catch {
-      // 忽略无法解析或非本协议的数据包
+      this.addLog({
+        ok: true,
+        from,
+        name: String(data.name || 'Songloft TV'),
+        ip: data.ip,
+        port: Number(data.port),
+        version: String(data.version || ''),
+        raw: this.truncate(raw),
+      });
+    } catch (e) {
+      this.addLog({ ok: false, from, raw: '', error: String(e) });
     }
+  }
+
+  /** 解码 beacon：宿主 UDP API 对原始字节再包一层 base64，协议层为 base64 编码的 JSON；旧版 TV 为明文 JSON，解码失败时回退 */
+  private decodeBeacon(b64: string): string {
+    const toUtf8 = (s: string) => new TextDecoder('utf-8').decode(Uint8Array.from(s, (c) => c.charCodeAt(0)));
+    const layer1 = atob(b64);
+    try {
+      const utf8 = toUtf8(atob(layer1));
+      JSON.parse(utf8);
+      return utf8;
+    } catch {
+      return toUtf8(layer1);
+    }
+  }
+
+  private truncate(s: string, n = RAW_TRUNCATE): string {
+    return s.length > n ? `${s.slice(0, n)}…` : s;
+  }
+
+  private addLog(entry: Omit<BeaconLog, 'id' | 'ts'>): void {
+    this.logs.push({ id: ++this.logSeq, ts: Date.now(), ...entry });
+    if (this.logs.length > LOG_LIMIT) this.logs.splice(0, this.logs.length - LOG_LIMIT);
+  }
+
+  /** 增量拉取广播日志（id > afterId；afterId <= 0 返回最近 LOG_FETCH_MAX 条） */
+  listLogs(afterId: number): BeaconLog[] {
+    if (afterId <= 0) return this.logs.slice(-LOG_FETCH_MAX);
+    const idx = this.logs.findIndex((l) => l.id > afterId);
+    if (idx < 0) return [];
+    return this.logs.slice(idx, idx + LOG_FETCH_MAX);
   }
 
   private prune(): void {
