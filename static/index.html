@@ -11,12 +11,22 @@ h1{font-size:18px;font-weight:600;margin-bottom:4px}
 .sub{font-size:12px;color:var(--md-on-surface-variant);margin-bottom:20px}
 .card h2{font-size:13px;font-weight:600;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--md-on-surface-variant)}
 
+/* 页签：广播发现 / 主动嗅探 二选一 */
+.tabs{display:flex;margin-bottom:16px;border-bottom:1px solid var(--md-outline-variant)}
+.tab{flex:1;padding:12px;font-size:14px;text-align:center;color:var(--md-on-surface-variant);
+background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit}
+.tab.active{color:var(--md-primary);border-bottom-color:var(--md-primary);font-weight:600}
+.panel{display:none}
+.panel.active{display:block}
+
 /* 顶部监听状态 */
 .listen-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.listen-info{display:flex;align-items:center;gap:10px;min-width:0}
 .status{font-size:12px;padding:8px 12px;border-radius:6px;display:none}
 .status.ok{display:inline-block;background:rgba(76,175,80,.1);color:var(--md-success)}
 .status.err{display:inline-block;background:rgba(229,115,115,.1);color:var(--md-error)}
 .status.info{display:inline-block;background:rgba(124,154,224,.1);color:var(--md-primary)}
+.status.idle{display:inline-block;background:rgba(127,127,127,.12);color:var(--md-on-surface-variant)}
 .count{font-size:12px;color:var(--md-on-surface-variant)}
 
 /* 设备行 */
@@ -30,6 +40,14 @@ h1{font-size:18px;font-weight:600;margin-bottom:4px}
 .tag{font-size:11px;color:var(--md-on-surface-variant);flex-shrink:0}
 .btn-sm{height:32px;padding:0 16px;font-size:13px}
 .empty{font-size:13px;color:var(--md-on-surface-variant);padding:16px 0;text-align:center;margin:0}
+
+/* 配置输入 */
+.input-sm{box-sizing:border-box;height:32px;padding:0 10px;font-size:13px;border:1px solid var(--md-outline);border-radius:var(--md-radius-sm,8px);background:var(--md-surface);color:var(--md-on-surface);outline:none;font-family:inherit}
+.input-sm:focus{border-color:var(--md-primary)}
+.manual-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.manual-row .input-sm{flex:1;min-width:110px}
+.cfg-row{display:flex;gap:8px}
+.cfg-row .input-sm{flex:1}
 
 /* 操作反馈 */
 .action{margin-top:16px}
@@ -68,35 +86,83 @@ h1{font-size:18px;font-weight:600;margin-bottom:4px}
   <h1>电视助手</h1>
   <p class="sub">Songloft TV客户端助手，提供配对码登录等功能</p>
 
-  <div class="listen-row">
-    <span class="status info" id="listenStatus">监听中…</span>
-    <span class="count" id="onlineCount"></span>
+  <div class="tabs">
+    <button class="tab active" id="tabBeacon" data-tab="beacon">广播发现</button>
+    <button class="tab" id="tabScan" data-tab="scan">主动嗅探</button>
   </div>
 
-  <div class="card">
-    <h2>在线设备</h2>
-    <div id="deviceList">
-      <p class="empty">未发现电视，请确认电视已打开并停留在登录配置页（同一局域网）</p>
+  <!-- 广播发现：UDP beacon，需电视与宿主在同一局域网且广播可达 -->
+  <div class="panel active" id="panelBeacon">
+    <div class="listen-row">
+      <div class="listen-info">
+        <span class="status idle" id="listenStatus">未监听</span>
+        <span class="count" id="onlineCount"></span>
+      </div>
+      <button class="btn btn-filled btn-sm" id="listenToggleBtn">开始监听</button>
     </div>
-  </div>
+    <p class="log-hint">适合电视与宿主在同一局域网且广播可达（Docker 建议 host / macvlan 网络）；电视不在同一局域网或广播不可达时，请切换到「主动嗅探」</p>
 
-  <div class="card" id="historyCard" style="display:none">
-    <h2>最近设备</h2>
-    <div id="historyList"></div>
-  </div>
-
-  <div class="card">
-    <div class="log-header">
-      <h2>广播日志</h2>
-      <div class="log-ctrl">
-        <button class="btn btn-text btn-sm active" id="logFollowBtn">跟随</button>
-        <button class="btn btn-text btn-sm" id="logClearBtn">清空</button>
+    <div class="card">
+      <h2>设备列表</h2>
+      <div id="deviceList">
+        <p class="empty">未发现电视，请确认电视已打开并停留在登录配置页（同一局域网）</p>
       </div>
     </div>
-    <div id="logBox" class="log-box">
-      <div class="log-line other"><span class="log-body">等待广播…</span></div>
+
+    <div class="card" id="historyCard" style="display:none">
+      <h2>最近设备</h2>
+      <div id="historyList"></div>
     </div>
-    <p class="log-hint">显示 UDP 18910 收到的全部数据包；电视停留在登录配置页时每 2 秒广播一次，绿色=解析成功，红色=解析失败</p>
+
+    <div class="card">
+      <div class="log-header">
+        <h2>广播日志</h2>
+        <div class="log-ctrl">
+          <button class="btn btn-text btn-sm active" id="logFollowBtn">跟随</button>
+          <button class="btn btn-text btn-sm" id="logClearBtn">清空</button>
+        </div>
+      </div>
+      <div id="logBox" class="log-box">
+        <div class="log-line other"><span class="log-body">等待广播…</span></div>
+      </div>
+      <p class="log-hint">显示 UDP 18910 收到的全部数据包；电视停留在登录配置页时每 2 秒广播一次，绿色=解析成功，红色=解析失败。广播不到（电视与宿主不在同一局域网 / Docker bridge 网络 / AP 隔离）时，请切换到「主动嗅探」页签</p>
+    </div>
+  </div>
+
+  <!-- 主动嗅探：插件主动扫描局域网 /probe 接口，广播不可达时的替代方案 -->
+  <div class="panel" id="panelScan">
+    <div class="listen-row">
+      <span class="status idle" id="scanStatus">已停止</span>
+      <button class="btn btn-filled btn-sm" id="scanToggleBtn">开始嗅探</button>
+    </div>
+
+    <div class="card">
+      <h2>嗅探配置</h2>
+      <div class="manual-row">
+        <input type="text" id="scanCidrInput" class="input-sm" placeholder="嗅探网段，如 192.168.1.0/24（留空自动检测）">
+        <input type="number" id="scanPortInput" class="input-sm" placeholder="端口" value="18899">
+        <button class="btn btn-filled btn-sm" id="scanCfgSaveBtn">保存</button>
+      </div>
+      <p class="log-hint">留空按宿主网卡自动推导 /24；多个网段用逗号分隔。TV 需 v1.1.5+ 并停留在登录配置页</p>
+    </div>
+
+    <div class="card">
+      <h2>设备列表</h2>
+      <div id="scannedList">
+        <p class="empty">嗅探未开启，点击「开始嗅探」扫描局域网内的 TV</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>手动配对</h2>
+      <div class="manual-row">
+        <input type="text" id="manualIp" class="input-sm" placeholder="电视 IP，如 192.168.1.50">
+        <input type="number" id="manualPort" class="input-sm" placeholder="端口" value="18899">
+        <button class="btn btn-filled btn-sm" id="probeBtn">探测</button>
+        <span class="status idle" id="probeStatus"></span>
+      </div>
+      <p class="log-hint">广播与嗅探都发现不了时，手动输入 IP 探测；探测成功自动加入嗅探设备列表</p>
+    </div>
   </div>
 
   <div class="status action" id="actionStatus" aria-live="polite"></div>
@@ -127,6 +193,13 @@ if (!apiGet) {
   };
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+// 页面从宿主公网域名/公网 IP 加载时（如 https://music.example.com:23456），提取 origin 供后端推送给 TV；内网访问返回空
+const publicOrigin = () => {
+  const h = window.location.hostname || '';
+  if (!h || h === 'localhost' || h.startsWith('127.')) return '';
+  if (/^(10\.|192\.168\.)/.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) return '';
+  return window.location.origin;
+};
 const fmtTime = ts => {
   const d = new Date(ts), p = x => (x < 10 ? '0' + x : x);
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -134,6 +207,31 @@ const fmtTime = ts => {
 
 let loggingIn = false;
 let pendingLogin = null;
+let activeTab = 'beacon';
+// 当前开关状态（由 loadDevices 更新），用于自适应轮询频率
+let listenOn = false, scanOn = false;
+let scanningState = false;
+
+function applyTabUI(name) {
+  $('tabBeacon').classList.toggle('active', name === 'beacon');
+  $('tabScan').classList.toggle('active', name === 'scan');
+  $('panelBeacon').classList.toggle('active', name === 'beacon');
+  $('panelScan').classList.toggle('active', name === 'scan');
+}
+
+// 页签切换只影响显示，两个模式的开关（广播监听 / 嗅探心跳）各自独立、手动控制
+function switchTab(name) {
+  if (name === activeTab) return;
+  applyTabUI(name);
+  activeTab = name;
+  // 切走老页签时自动关闭其开关（进入新页签不自动打开任何开关）
+  const stopUrl = name === 'scan' ? '/api/listen/stop' : '/api/scan/stop';
+  apiPost(stopUrl).then(() => loadDevices());
+}
+document.querySelectorAll('.tab').forEach(t =>
+  t.addEventListener('click', () => switchTab(t.dataset.tab))
+);
+// 每次打开默认「广播发现」页签（不恢复上次页签）
 
 // 广播日志：增量轮询 + 自动滚动（上滚暂停，点「跟随」恢复）
 let lastLogId = 0;
@@ -190,14 +288,72 @@ function setStatus(el, cls, text) {
   el.textContent = text;
 }
 
+// 广播监听开关
+$('listenToggleBtn').addEventListener('click', async () => {
+  const isOn = $('listenToggleBtn').textContent === '停止监听';
+  const res = await apiPost(isOn ? '/api/listen/stop' : '/api/listen/start');
+  const st = $('actionStatus');
+  setStatus(st, res && res.success ? 'ok' : 'err', res && res.message || '操作失败');
+  loadDevices();
+});
+
+// 嗅探心跳开关
+$('scanToggleBtn').addEventListener('click', async () => {
+  const isOn = $('scanToggleBtn').textContent === '停止嗅探';
+  const res = await apiPost(isOn ? '/api/scan/stop' : '/api/scan/start');
+  const st = $('actionStatus');
+  setStatus(st, res && res.success ? 'ok' : 'err', res && res.message || '操作失败');
+  loadDevices();
+});
+
+$('scanCfgSaveBtn').addEventListener('click', async () => {
+  const res = await apiPost('/api/config', {
+    scanCidr: $('scanCidrInput').value.trim(),
+    scanPort: Number($('scanPortInput').value),
+  });
+  const st = $('actionStatus');
+  setStatus(st, res && res.success ? 'ok' : 'err', res && res.message || '已保存');
+});
+
+// 手动探测：请求该 IP 的 /probe，成功（songloft-tv）自动加入嗅探设备列表
+$('probeBtn').addEventListener('click', async () => {
+  const ip = $('manualIp').value.trim();
+  const port = Number($('manualPort').value) || 18899;
+  const st = $('probeStatus');
+  if (!ip) { setStatus(st, 'err', '请先填写电视 IP'); return; }
+  setStatus(st, 'info', `正在探测 ${ip}:${port}/probe …`);
+  const res = await apiPost('/api/probe', { ip, port });
+  const d = res && res.data;
+  if (!d) { setStatus(st, 'err', '探测失败'); return; }
+  if (d.error) {
+    setStatus(st, 'err', `连接失败：${esc(d.error)}（${d.elapsedMs}ms）`);
+  } else if (d.added) {
+    setStatus(st, 'ok', `已添加 ${esc(d.device.name)}（${esc(d.device.ip)}:${d.device.port}）`);
+    loadDevices();
+  } else if (d.httpStatus === 200) {
+    setStatus(st, 'err', `HTTP 200 但非 songloft-tv：${esc(d.body || '(空)')}`);
+  } else {
+    setStatus(st, 'err', `HTTP ${d.httpStatus}（${d.elapsedMs}ms），TV 不支持 /probe（需 v1.1.5+）或端口不对`);
+  }
+});
+
 function deviceRow(dev, online) {
-  const name = `<span class="device-name">${esc(dev.name)}${dev.version ? `<span class="version">v${esc(dev.version)}</span>` : ''}</span>`;
+  const tags = [];
+  if (dev.manual) tags.push('手动');
+  else if (dev.source === 'scan') tags.push('嗅探');
+  else tags.push('广播');
+  const tagHtml = tags.length ? `<span class="version">${tags.join(' · ')}</span>` : '';
+  const name = `<span class="device-name">${esc(dev.name)}${dev.version ? `<span class="version">v${esc(dev.version)}</span>` : ''}${tagHtml}</span>`;
   const meta = online
     ? `${esc(dev.ip)}:${dev.port}`
     : `${esc(dev.ip)}:${dev.port} · 上次 ${fmtTime(dev.lastSeen)}`;
-  const right = online
-    ? `<button class="btn btn-filled btn-sm" data-login="${esc(dev.ip)}|${dev.port}" ${loggingIn ? 'disabled' : ''}>登录</button>`
-    : `<span class="tag">离线</span>`;
+  let right;
+  if (online) {
+    right = `<button class="btn btn-filled btn-sm" data-login="${esc(dev.ip)}|${esc(dev.port)}" ${loggingIn ? 'disabled' : ''}>登录</button>`;
+    right += `<button class="btn btn-text btn-sm" data-remove-device="${esc(dev.ip)}|${esc(dev.port)}">移除</button>`;
+  } else {
+    right = `<span class="tag">离线</span>`;
+  }
   return `<div class="device-row${online ? '' : ' offline'}"><div class="device-info">${name}<span class="device-meta">${meta}</span></div>${right}</div>`;
 }
 
@@ -208,19 +364,61 @@ async function loadDevices() {
       setStatus($('listenStatus'), 'err', '接口异常');
       return;
     }
-    setStatus($('listenStatus'), res.listening ? 'ok' : 'err', res.listening ? '监听中' : '监听失败');
+    listenOn = !!res.listening;
+    scanOn = !!res.scanning;
+    setStatus($('listenStatus'), res.listening ? 'ok' : 'err',
+      res.listening ? '监听中' : '已停止（广播发现不可用时可开启嗅探）');
 
-    const online = (res.data && res.data.online) || [];
+    const devices = (res.data && res.data.devices) || [];
     const history = (res.data && res.data.history) || [];
-    $('onlineCount').textContent = online.length ? `${online.length} 台在线` : '';
+    const cfg = (res.data && res.data.config) || {};
+    const cInput = $('scanCidrInput');
+    if (cInput && !cInput.value && cfg.scanCidr) cInput.value = cfg.scanCidr;
+    const pInput = $('scanPortInput');
+    if (pInput && !pInput.value && cfg.scanPort) pInput.value = String(cfg.scanPort);
 
-    $('deviceList').innerHTML = online.length
-      ? online.map(d => deviceRow(d, true)).join('')
-      : '<p class="empty">未发现电视，请确认电视已打开并停留在登录配置页（同一局域网）</p>';
+    // 广播监听开关状态
+    const lBtn = $('listenToggleBtn');
+    if (lBtn) {
+      lBtn.textContent = res.listening ? '停止监听' : '开始监听';
+      lBtn.classList.toggle('btn-filled', !res.listening);
+    }
 
-    const offline = history.filter(d => !online.some(o => o.ip === d.ip && o.port === d.port));
+    // 嗅探心跳状态
+    scanningState = !!res.scanning;
+    const sBtn = $('scanToggleBtn');
+    if (sBtn) {
+      sBtn.textContent = scanningState ? '停止嗅探' : '开始嗅探';
+      sBtn.classList.toggle('btn-filled', !scanningState);
+    }
+    let scanInfoText = '';
+    if (scanningState && res.scanProgress) {
+      const p = res.scanProgress;
+      scanInfoText = ` · 扫描中 ${p.done}/${p.total}（本批起始 ${esc(p.currentIp)}，128 个并发）`;
+    } else if (res.scanInfo && res.scanInfo.total > 0) {
+      const si = res.scanInfo;
+      scanInfoText = ` · 上轮 ${esc(si.subnets.join(','))}（${si.total} IP）发现 ${si.found} 台（用时 ${(si.durationMs / 1000).toFixed(1)}s）`
+        + (si.httpOnly ? `，${si.httpOnly} 台有 HTTP 但无 /probe` : '');
+    }
+    setStatus($('scanStatus'), scanningState ? 'info' : 'idle',
+      scanningState ? '嗅探中（每 15 秒扫描一次）' + scanInfoText : '已停止' + scanInfoText);
+
+    $('onlineCount').textContent = devices.length ? `${devices.length} 台在线` : '';
+
+    // 两个页签共用同一设备列表（统一口径：在线设备 + 手动设备）
+    $('deviceList').innerHTML = devices.length
+      ? devices.map(d => deviceRow(d, true)).join('')
+      : '<p class="empty">未发现电视，请确认电视已打开并停留在登录配置页（同一局域网）；广播不到时切换到「主动嗅探」页签</p>';
+
+    const offline = history.filter(d => !devices.some(o => o.ip === d.ip && o.port === d.port));
     $('historyCard').style.display = offline.length ? '' : 'none';
     if (offline.length) $('historyList').innerHTML = offline.map(d => deviceRow(d, false)).join('');
+
+    $('scannedList').innerHTML = devices.length
+      ? devices.map(d => deviceRow(d, true)).join('')
+      : `<p class="empty">${scanning
+        ? '未发现 TV，请确认电视停留在登录配置页、电视与宿主网络可达（/probe 接口需 TV v1.1.5+）'
+        : '嗅探未开启，点击「开始嗅探」扫描局域网内的 TV'}</p>`;
   } catch (e) {
     setStatus($('listenStatus'), 'err', '加载失败');
   }
@@ -242,7 +440,7 @@ async function doLogin(ip, port, pin) {
   const st = $('actionStatus');
   setStatus(st, 'info', '正在发送登录请求…');
   try {
-    const res = await apiPost('/api/login', { ip, port, pin });
+    const res = await apiPost('/api/login', { ip, port, pin, origin: publicOrigin() });
     if (res && res.success) setStatus(st, 'ok', res.message || '已发送，电视端正在登录');
     else setStatus(st, 'err', (res && res.message) || '登录失败');
   } catch (e) {
@@ -258,6 +456,11 @@ document.addEventListener('click', e => {
   if (btn) {
     const [ip, port] = btn.dataset.login.split('|');
     askLogin(ip, Number(port));
+    return;
+  }
+  if (e.target.closest('[data-remove-device]')) {
+    const [rip, rport] = e.target.closest('[data-remove-device]').dataset.removeDevice.split('|');
+    apiPost('/api/devices/remove', { ip: rip, port: Number(rport) }).then(loadDevices);
     return;
   }
   if (e.target.closest('#dialogConfirmBtn')) {
@@ -277,9 +480,15 @@ document.addEventListener('click', e => {
 });
 
 loadDevices();
-setInterval(loadDevices, 3000);
+// 轮询间隔自适应：任一模式开启时 3s（设备列表会变化），全关时 15s（仅保持历史/手动状态新鲜）
+async function refreshDevices() {
+  await loadDevices();
+  setTimeout(refreshDevices, (listenOn || scanOn) ? 3000 : 15000);
+}
+refreshDevices();
+// 广播日志只在监听开启时轮询（关闭监听后不会有新日志）
 loadLogs();
-setInterval(loadLogs, 2000);
+setInterval(() => { if (activeTab === 'beacon' && listenOn) loadLogs(); }, 2000);
 </script>
 </body>
 </html>
