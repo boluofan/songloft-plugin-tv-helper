@@ -1,6 +1,6 @@
 {
   "name": "tv-helper",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Songloft TV客户端助手，提供配对码登录等功能",
   "private": true,
   "scripts": {

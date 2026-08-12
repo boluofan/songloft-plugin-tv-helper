@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/songloft-org/plugin-toolchain/main/schemas/plugin.schema.json",
   "name": "电视助手",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Songloft TV客户端助手，提供配对码登录等功能",
   "author": "boluofan",
   "license": "Apache-2.0",
